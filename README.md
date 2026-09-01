@@ -7,10 +7,6 @@ simple flake using this:
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     latex-flake.url = "github:adrianmgg/latex-flake";
-    latex-flake.inputs = {
-      nixpkgs.follows = "nixpkgs";
-      flake-parts.follows = "flake-parts";
-    };
   };
   outputs = inputs @ { flake-parts, ... }:
     flake-parts.lib.mkFlake {inherit inputs;} {
