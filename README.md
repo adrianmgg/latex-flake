@@ -80,10 +80,7 @@ Should a `<name>-builder` package also be exposed for each document?
 
 ## `latex.exportWatchBuilder`
 Should a `<name>-watch-builder` package also be exposed for each document?
-(This is like `latex.exportBuilder`, but with a script that will watch for changes to the source files and automatically re-build the document when they're changed.)
-
-> [!WARNING]
-> This isn't implemented yet!
+(This is like `latex.exportBuilder`, but with a wrapper script that will watch for changes to all source files and automatically re-build the document when they're changed.)
 
 ## `latex.exportTexlive`
 Should the resolved texlive package for each document also be exposed?

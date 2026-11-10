@@ -55,32 +55,26 @@ in {
 
     config.packages =
       lib.attrsets.concatMapAttrs (name: doc: let
-        inherit (lib.strings) escapeShellArg;
+        inherit (lib.strings) escapeShellArg escapeShellArgs;
         texlivePackagesFn = ps:
           (config.latex.texlivePackages ps)
           ++ (doc.texlivePackages ps);
-        texlive =
-          if doc.texlive or null != null
-          then doc.texlive
-          else if config.latex.texlive or null != null
-          then config.latex.texlive
-          else pkgs.texlive.withPackages texlivePackagesFn;
-        root =
-          if doc.root or null != null
-          then doc.root
-          else if config.latex.root or null != null
-          then config.latex.root
-          else dirOf doc.texFile;
+        # TODO there's probably a more nix idiomatic way of doing this
+        # TODO also this should have a more descriptive name
+        getThing = name: default:
+          if doc.${name} or null != null
+          then doc.${name}
+          else if config.latex.${name} or null != null
+          then config.latex.${name}
+          else default;
+        texlive = getThing "texlive" pkgs.texlive.withPackages texlivePackagesFn;
+        root = getThing "root" (dirOf doc.texFile);
         src =
           if doc.src or null != null
           then doc.src
           else doc.texFile;
-        exportBuilder =
-          if doc.exportBuilder or null != null
-          then doc.exportBuilder
-          else if config.latex.exportBuilder or null != null
-          then config.latex.exportBuilder
-          else false;
+        exportBuilder = getThing "exportBuilder" false;
+        exportWatchBuilder = getThing "exportWatchBuilder" false;
         texPathRelativeToRoot = lib.path.removePrefix root doc.texFile;
         builder = pkgs.writeShellApplication {
           name = "${name}-builder";
@@ -94,11 +88,8 @@ in {
         buildWatcher = pkgs.writeShellApplication {
           name = "${name}-watch-builder";
           runtimeInputs = [builder pkgs.watchexec];
-          # text = ''
-          #   watchexec --watch-file TODO -- ${escapeShellArg (lib.getExe builder)}
-          # '';
           text = ''
-            watchexec --watch-file TODO -- ${escapeShellArg builder.name}
+            watchexec ${escapeShellArgs (lib.lists.concatMap (x: ["--watch" x]) (lib.fileset.toList src))} -- ${escapeShellArg builder.name}
           '';
           derivationArgs.strictDeps = true;
         };
@@ -125,6 +116,8 @@ in {
         "${name}" = pdf;
       } // optionalAttrs exportBuilder {
         "${name}-build" = builder;
+      } // optionalAttrs exportWatchBuilder {
+        "${name}-watch-builder" = buildWatcher;
       })
       config.latex.documents;
   });
