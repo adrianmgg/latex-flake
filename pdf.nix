@@ -5,6 +5,8 @@
 }: let
   inherit (lib) types mkOption;
   inherit (lib.attrsets) optionalAttrs;
+  inherit (lib.trivial) flip pipe;
+  inherit (lib.strings) escapeShellArg escapeShellArgs;
 in {
   options.perSystem = flake-parts-lib.mkPerSystemOption ({
     config,
@@ -55,7 +57,6 @@ in {
 
     config.packages =
       lib.attrsets.concatMapAttrs (name: doc: let
-        inherit (lib.strings) escapeShellArg escapeShellArgs;
         texlivePackagesFn = ps:
           (config.latex.texlivePackages ps)
           ++ (doc.texlivePackages ps);
@@ -68,32 +69,38 @@ in {
           then config.latex.${name}
           else default;
         texlive = getThing "texlive" pkgs.texlive.withPackages texlivePackagesFn;
-        root = getThing "root" (dirOf doc.texFile);
+        texFile = doc.texFile;
+        root = getThing "root" (dirOf texFile);
         src =
           if doc.src or null != null
           then doc.src
-          else doc.texFile;
+          else texFile;
         exportBuilder = getThing "exportBuilder" false;
         exportWatchBuilder = getThing "exportWatchBuilder" false;
-        texPathRelativeToRoot = lib.path.removePrefix root doc.texFile;
+        pathRelativeToRoot = lib.path.removePrefix root;
         builder = pkgs.writeShellApplication {
           name = "${name}-builder";
           runtimeInputs = [texlive] ++ doc.extraBuildInputs;
           text = ''
             mkdir -p .cache/latex
-            latexmk -interaction=nonstopmode -auxdir=.cache/latex -pdf ${escapeShellArg texPathRelativeToRoot}
+            latexmk -interaction=nonstopmode -auxdir=.cache/latex -pdf ${escapeShellArg (pathRelativeToRoot texFile)}
           '';
           derivationArgs.strictDeps = true;
         };
         buildWatcher = pkgs.writeShellApplication {
           name = "${name}-watch-builder";
           runtimeInputs = [builder pkgs.watchexec];
-          text = ''
-            watchexec ${escapeShellArgs (lib.lists.concatMap (x: ["--watch" x]) (lib.fileset.toList src))} -- ${escapeShellArg builder.name}
+          text = let
+            watchArgs = pipe src [
+              lib.fileset.toList
+              (map pathRelativeToRoot)
+              (lib.lists.concatMap (x: ["--watch" x]))
+            ];
+          in ''
+            watchexec ${escapeShellArgs watchArgs} -- ${escapeShellArg builder.name}
           '';
           derivationArgs.strictDeps = true;
         };
-        # TODO look @ using runCommand instead?
         pdf = pkgs.stdenv.mkDerivation {
           pname = name;
           inherit (doc) version;
