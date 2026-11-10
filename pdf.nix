@@ -4,6 +4,7 @@
   ...
 }: let
   inherit (lib) types mkOption;
+  inherit (lib.attrsets) optionalAttrs;
 in {
   options.perSystem = flake-parts-lib.mkPerSystemOption ({
     config,
@@ -54,6 +55,7 @@ in {
 
     config.packages =
       lib.attrsets.concatMapAttrs (name: doc: let
+        inherit (lib.strings) escapeShellArg;
         texlivePackagesFn = ps:
           (config.latex.texlivePackages ps)
           ++ (doc.texlivePackages ps);
@@ -73,22 +75,34 @@ in {
           if doc.src or null != null
           then doc.src
           else doc.texFile;
+        exportBuilder =
+          if doc.exportBuilder or null != null
+          then doc.exportBuilder
+          else if config.latex.exportBuilder or null != null
+          then config.latex.exportBuilder
+          else false;
         texPathRelativeToRoot = lib.path.removePrefix root doc.texFile;
         builder = pkgs.writeShellApplication {
           name = "${name}-builder";
           runtimeInputs = [texlive] ++ doc.extraBuildInputs;
           text = ''
             mkdir -p .cache/latex
-            latexmk -interaction=nonstopmode -auxdir=.cache/latex -pdf ${lib.strings.escapeShellArg texPathRelativeToRoot}
+            latexmk -interaction=nonstopmode -auxdir=.cache/latex -pdf ${escapeShellArg texPathRelativeToRoot}
           '';
+          derivationArgs.strictDeps = true;
         };
-        # buildWatcher = pkgs.writeShellApplication {
-        #   name = "${name}-watch-builder";
-        #   runtimeInputs = [builder pkgs.watchexec];
-        #   text = ''
-        #     watchexec -e tex,bib -- build-pdf
-        #   '';
-        # };
+        buildWatcher = pkgs.writeShellApplication {
+          name = "${name}-watch-builder";
+          runtimeInputs = [builder pkgs.watchexec];
+          # text = ''
+          #   watchexec --watch-file TODO -- ${escapeShellArg (lib.getExe builder)}
+          # '';
+          text = ''
+            watchexec --watch-file TODO -- ${escapeShellArg builder.name}
+          '';
+          derivationArgs.strictDeps = true;
+        };
+        # TODO look @ using runCommand instead?
         pdf = pkgs.stdenv.mkDerivation {
           pname = name;
           inherit (doc) version;
@@ -96,18 +110,21 @@ in {
             fileset = src;
             inherit root;
           };
-          buildInputs = [builder];
+          nativeBuildInputs = [builder];
           buildPhase = ''
-            ${lib.escapeShellArg "${name}-builder"}
+            ${escapeShellArg builder.name}
           '';
           installPhase = ''
             mkdir -p $out
             cp *.pdf $out/
           '';
           dontFixup = true;
+          strictDeps = true;
         };
       in {
         "${name}" = pdf;
+      } // optionalAttrs exportBuilder {
+        "${name}-build" = builder;
       })
       config.latex.documents;
   });
