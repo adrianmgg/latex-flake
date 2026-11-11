@@ -66,6 +66,16 @@ In order, this is how the texlive package for a particular document is decided:
 3. `latex.coreTexlivePackages`, `latex.texlivePackages`, and `latex.documents.<name>.texlivePackages`, all merged together.
 
 # options
+## `latex.engine`
+Which program to use to compile all documents. 
+One of `"pdflatex"`, `"lualatex"`, `"xelatex"`.
+The required dependencies will automatically be added, **unless** you're manually setting `coreTexlivePackages` or `texlive` in which case you'll need to do that yourself.
+
+Default:
+```nix
+"pdflatex"
+```
+
 ## `latex.texlive`
 manually set your own texlive package. you should typically use `latex.texlivePackages` instead.
 
@@ -124,6 +134,9 @@ If not specified, defaults to a fileset containing just this document's `.texFil
 ## `latex.documents.<name>.root`
 Root used to resolve the `src` fileset into a store path via `lib.fileset.toSource`.
 If not specified, defaults to the parent directory of this document's `texFile`.
+
+## `latex.documents.<name>.engine`
+Per-document override of engine. See `latex.engine` for details.
 
 ## `latex.documents.<name>.texlive`
 Like `latex.texlive`, but for just this document.

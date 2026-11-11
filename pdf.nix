@@ -7,20 +7,34 @@
   inherit (lib.attrsets) optionalAttrs;
   inherit (lib.trivial) flip pipe;
   inherit (lib.strings) escapeShellArg escapeShellArgs;
+  inherit (lib.lists) optional;
+  latexEngineType = types.enum ["pdflatex" "lualatex" "xelatex"];
+  # TODO probably shouldn't be unspecified...
+  texliveWithPackagesFunctionType = types.functionTo (types.listOf types.unspecified);
 in {
   options.perSystem = flake-parts-lib.mkPerSystemOption ({
     config,
     pkgs,
     lib,
     ...
-  }: {
+  }: let
+    cfg = config.latex;
+  in {
+    options.latex.engine = mkOption {
+      type = latexEngineType;
+      default = "pdflatex";
+    };
     options.latex.texlive = mkOption {type = types.nullOr types.package;};
     options.latex.coreTexlivePackages = mkOption {
-      type = types.functionTo (types.listOf types.unspecified);
-      default = ps: [ps.scheme-basic ps.latexmk];
+      type = texliveWithPackagesFunctionType;
+      # default = ps: [ps.scheme-basic ps.latexmk];
+      default = ps:
+        [ps.scheme-basic ps.latexmk]
+        ++ optional (cfg.engine == "lualatex") ps.luatex
+        ++ optional (cfg.engine == "xelatex") ps.xetex;
     };
     options.latex.texlivePackages = mkOption {
-      type = types.functionTo (types.listOf types.unspecified);
+      type = texliveWithPackagesFunctionType;
       default = ps: [];
     };
     options.latex.exportBuilder = mkOption {
@@ -40,9 +54,10 @@ in {
         options.texFile = mkOption {type = types.path;};
         options.src = mkOption {type = types.nullOr types.fileset;};
         options.root = mkOption {type = types.nullOr types.path;};
+        options.engine = mkOption {type = types.nullOr latexEngineType;};
         options.texlive = mkOption {type = types.nullOr types.package;};
         options.texlivePackages = mkOption {
-          type = types.functionTo (types.listOf types.package);
+          type = texliveWithPackagesFunctionType;
           default = ps: [];
         };
         options.extraBuildInputs = mkOption {
@@ -61,18 +76,23 @@ in {
 
     config.packages = lib.attrsets.concatMapAttrs (name: doc: let
       texlivePackagesFn = ps:
-        (config.latex.coreTexlivePackages ps)
-        ++ (config.latex.texlivePackages ps)
+        (cfg.coreTexlivePackages ps)
+        ++ (cfg.texlivePackages ps)
         ++ (doc.texlivePackages ps);
       # TODO there's probably a more nix idiomatic way of doing this
       # TODO also this should have a more descriptive name
       getThing = name: default:
         if doc.${name} or null != null
         then doc.${name}
-        else if config.latex.${name} or null != null
-        then config.latex.${name}
+        else if cfg.${name} or null != null
+        then cfg.${name}
         else default;
-      texlive = getThing "texlive" pkgs.texlive.withPackages texlivePackagesFn;
+      getThing' = name:
+        if doc.${name} or null != null
+        then doc.${name}
+        else cfg.${name};
+      engine = getThing' "engine";
+      texlive = getThing "texlive" (pkgs.texlive.withPackages texlivePackagesFn);
       texFile = doc.texFile;
       root = getThing "root" (dirOf texFile);
       srcWithoutMain =
@@ -86,9 +106,11 @@ in {
       builder = pkgs.writeShellApplication {
         name = "${name}-builder";
         runtimeInputs = [texlive] ++ doc.extraBuildInputs;
+        # NOTE this just does -${engine} for now since with the current options & option names that's sufficient.
+        #      should probably improve that at some point tho.
         text = ''
           mkdir -p .cache/latex
-          latexmk -interaction=nonstopmode -auxdir=.cache/latex -pdf ${escapeShellArg (pathRelativeToRoot texFile)}
+          latexmk -interaction=nonstopmode ${escapeShellArg "-${engine}"} -auxdir=.cache/latex -pdf ${escapeShellArg (pathRelativeToRoot texFile)}
         '';
         derivationArgs.strictDeps = true;
       };
@@ -139,6 +161,6 @@ in {
       // optionalAttrs exportWatchBuilder {
         "${name}-watch-builder" = buildWatcher;
       })
-    config.latex.documents;
+    cfg.documents;
   });
 }
