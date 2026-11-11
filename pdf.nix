@@ -107,7 +107,7 @@ in {
           '';
           derivationArgs.strictDeps = true;
         };
-        pdf = pkgs.stdenv.mkDerivation {
+        pdf = pkgs.stdenvNoCC.mkDerivation {
           pname = name;
           inherit (doc) version;
           src = lib.fileset.toSource {
