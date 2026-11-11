@@ -27,7 +27,6 @@ in {
     options.latex.texlive = mkOption {type = types.nullOr types.package;};
     options.latex.coreTexlivePackages = mkOption {
       type = texliveWithPackagesFunctionType;
-      # default = ps: [ps.scheme-basic ps.latexmk];
       default = ps:
         [ps.scheme-basic ps.latexmk]
         ++ optional (cfg.engine == "lualatex") ps.luatex
@@ -74,7 +73,7 @@ in {
       });
     };
 
-    config.packages = lib.attrsets.concatMapAttrs (name: doc: let
+    config.packages = flip lib.attrsets.concatMapAttrs cfg.documents (name: doc: let
       texlivePackagesFn = ps:
         (cfg.coreTexlivePackages ps)
         ++ (cfg.texlivePackages ps)
@@ -125,7 +124,6 @@ in {
             (map pathRelativeToRoot)
             # watchexec doesn't like `./`s in the filter things
             (map (lib.strings.removePrefix "./"))
-            # (lib.lists.concatMap (x: ["--watch" x]))
             (lib.lists.concatMap (x: ["--filter" x]))
           ];
         in ''
@@ -160,7 +158,6 @@ in {
       }
       // optionalAttrs exportWatchBuilder {
         "${name}-watch-builder" = buildWatcher;
-      })
-    cfg.documents;
+      });
   });
 }
