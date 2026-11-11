@@ -15,9 +15,13 @@ in {
     ...
   }: {
     options.latex.texlive = mkOption {type = types.nullOr types.package;};
-    options.latex.texlivePackages = mkOption {
+    options.latex.coreTexlivePackages = mkOption {
       type = types.functionTo (types.listOf types.unspecified);
       default = ps: [ps.scheme-basic ps.latexmk];
+    };
+    options.latex.texlivePackages = mkOption {
+      type = types.functionTo (types.listOf types.unspecified);
+      default = ps: [];
     };
     options.latex.exportBuilder = mkOption {
       type = types.bool;
@@ -58,7 +62,8 @@ in {
     config.packages =
       lib.attrsets.concatMapAttrs (name: doc: let
         texlivePackagesFn = ps:
-          (config.latex.texlivePackages ps)
+          (config.latex.coreTexlivePackages ps)
+          ++ (config.latex.texlivePackages ps)
           ++ (doc.texlivePackages ps);
         # TODO there's probably a more nix idiomatic way of doing this
         # TODO also this should have a more descriptive name
