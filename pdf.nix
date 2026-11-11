@@ -71,10 +71,11 @@ in {
         texlive = getThing "texlive" pkgs.texlive.withPackages texlivePackagesFn;
         texFile = doc.texFile;
         root = getThing "root" (dirOf texFile);
-        src =
+        srcWithoutMain =
           if doc.src or null != null
           then doc.src
           else texFile;
+        src = lib.fileset.union srcWithoutMain texFile;
         exportBuilder = getThing "exportBuilder" false;
         exportWatchBuilder = getThing "exportWatchBuilder" false;
         pathRelativeToRoot = lib.path.removePrefix root;
@@ -87,17 +88,22 @@ in {
           '';
           derivationArgs.strictDeps = true;
         };
+        # TODO should explcitly pass --project-origin to watchexec
         buildWatcher = pkgs.writeShellApplication {
           name = "${name}-watch-builder";
-          runtimeInputs = [builder pkgs.watchexec];
+          runtimeInputs = [pkgs.watchexec];
+          # watchexec seems to work best when called a la `--watch . --filter doc.tex` so we do it that way here
           text = let
             watchArgs = pipe src [
               lib.fileset.toList
               (map pathRelativeToRoot)
-              (lib.lists.concatMap (x: ["--watch" x]))
+              # watchexec doesn't like `./`s in the filter things
+              (map (lib.strings.removePrefix "./"))
+              # (lib.lists.concatMap (x: ["--watch" x]))
+              (lib.lists.concatMap (x: ["--filter" x]))
             ];
           in ''
-            watchexec ${escapeShellArgs watchArgs} -- ${escapeShellArg builder.name}
+            watchexec --watch . ${escapeShellArgs watchArgs} -- ${lib.meta.getExe builder}
           '';
           derivationArgs.strictDeps = true;
         };

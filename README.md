@@ -95,6 +95,9 @@ The main source file for this document.
 A fileset containing all the input files this document requires.
 If not specified, defaults to a fileset containing just this document's `.texFile`.
 
+> [!NOTE]
+> This document's `.texFile` will be implicitly included in this fileset, you don't need to add that manually.
+
 ## `latex.documents.<name>.root`
 Root used to resolve the `src` fileset into a store path via `lib.fileset.toSource`.
 If not specified, defaults to the parent directory of this document's `texFile`.
