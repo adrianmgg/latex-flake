@@ -105,11 +105,15 @@ in {
       builder = pkgs.writeShellApplication {
         name = "${name}-builder";
         runtimeInputs = [texlive] ++ doc.extraBuildInputs;
-        # NOTE this just does -${engine} for now since with the current options & option names that's sufficient.
-        #      should probably improve that at some point tho.
-        text = ''
+        text = let
+          perEngineArgs = {
+            "pdflatex" = ["-pdf"];
+            "lualatex" = ["-pdflua"];
+            "xelatex" = ["-pdfxe"];
+          };
+        in ''
           mkdir -p .cache/latex
-          latexmk -interaction=nonstopmode ${escapeShellArg "-${engine}"} -auxdir=.cache/latex -pdf ${escapeShellArg (pathRelativeToRoot texFile)}
+          latexmk -interaction=nonstopmode ${escapeShellArgs (perEngineArgs.${engine})} -auxdir=.cache/latex ${escapeShellArg (pathRelativeToRoot texFile)}
         '';
         derivationArgs.strictDeps = true;
       };
