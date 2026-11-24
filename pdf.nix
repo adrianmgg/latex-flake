@@ -143,8 +143,10 @@ in {
           inherit root;
         };
         nativeBuildInputs = [builder];
+        # FIXME bodge for https://github.com/NixOS/nixpkgs/blob/64edd99db0e71161886690ebcf23055725db3c38/doc/languages-frameworks/texlive.section.md#lualatex-font-cache-sec-language-texlive-lualatex-font-cache
+        #       should do a more proper solution
         buildPhase = ''
-          ${escapeShellArg builder.name}
+          env HOME=$(mktemp -d) ${escapeShellArg builder.name}
         '';
         installPhase = ''
           mkdir -p $out
