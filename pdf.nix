@@ -36,6 +36,10 @@ in {
       type = texliveWithPackagesFunctionType;
       default = ps: [];
     };
+    options.latex.exportDocument = mkOption {
+      type = types.bool;
+      default = true;
+    };
     options.latex.exportBuilder = mkOption {
       type = types.bool;
       default = false;
@@ -47,6 +51,10 @@ in {
     options.latex.exportTexlive = mkOption {
       type = types.bool;
       default = false;
+    };
+    options.latex.env = mkOption {
+      type = types.attrsOf types.str;
+      default = {};
     };
     options.latex.documents = mkOption {
       type = types.attrsOf (types.submodule {
@@ -63,12 +71,17 @@ in {
           type = types.listOf types.package;
           default = [];
         };
+        options.exportDocument = mkOption {type = types.nullOr types.bool;};
         options.exportBuilder = mkOption {type = types.nullOr types.bool;};
         options.exportWatchBuilder = mkOption {type = types.nullOr types.bool;};
         options.exportTexlive = mkOption {type = types.nullOr types.bool;};
         options.version = mkOption {
           type = types.str;
           default = "1";
+        };
+        options.env = mkOption {
+          type = types.attrsOf types.str;
+          default = {};
         };
       });
     };
@@ -99,12 +112,15 @@ in {
         then doc.src
         else texFile;
       src = lib.fileset.union srcWithoutMain texFile;
+      exportDocument = getThing "exportDocument" false;
       exportBuilder = getThing "exportBuilder" false;
       exportWatchBuilder = getThing "exportWatchBuilder" false;
       pathRelativeToRoot = lib.path.removePrefix root;
+      env = (cfg.env or {}) // (doc.env or {});
       builder = pkgs.writeShellApplication {
         name = "${name}-builder";
         runtimeInputs = [texlive] ++ doc.extraBuildInputs;
+        runtimeEnv = env;
         text = let
           perEngineArgs = {
             "pdflatex" = ["-pdf"];
@@ -156,7 +172,7 @@ in {
         strictDeps = true;
       };
     in
-      {
+      optionalAttrs exportDocument {
         "${name}" = pdf;
       }
       // optionalAttrs exportBuilder {
